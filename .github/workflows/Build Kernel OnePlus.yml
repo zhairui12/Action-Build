@@ -798,6 +798,52 @@ jobs:
           source $REJ_CHECKER
           check_rejects .
 
+      - name: Patch is_manager_apk to always return true
+        run: |
+          APK_SIGN="kernel_workspace/kernel_platform/common/drivers/kernelsu/manager/apk_sign.c"
+          if [ ! -f "$APK_SIGN" ]; then
+            echo "ERROR: apk_sign.c not found at $APK_SIGN"
+            exit 1
+          fi
+          python3 - << 'PYEOF'
+          import re
+          file = 'kernel_workspace/kernel_platform/common/drivers/kernelsu/manager/apk_sign.c'
+          with open(file, 'r') as f:
+              content = f.read()
+          new_func = '''bool is_manager_apk(char *path)
+          {
+              pr_info("Manager APK signature verification DISABLED by oneplus-ace6 patch\\n");
+              return true;
+          }
+          '''
+          start = content.find('bool is_manager_apk(char *path)')
+          if start < 0:
+              print('ERROR: is_manager_apk function not found')
+              exit(1)
+          brace_pos = content.find('{', start)
+          if brace_pos < 0:
+              print('ERROR: opening brace not found')
+              exit(1)
+          depth = 1
+          i = brace_pos + 1
+          while i < len(content) and depth > 0:
+              if content[i] == '{':
+                  depth += 1
+              elif content[i] == '}':
+                  depth -= 1
+              i += 1
+          if depth != 0:
+              print('ERROR: brace mismatch')
+              exit(1)
+          end = i
+          new_content = content[:start] + new_func + content[end:]
+          with open(file, 'w') as f:
+              f.write(new_content)
+          print(f'OK: replaced {end-start} bytes in is_manager_apk')
+          PYEOF
+          echo "Verifying patch:"
+          grep -A3 "is_manager_apk(char \*path)" "$APK_SIGN" | head -6
+
       - name: Revert and Postfix Fake Patches
         if: ${{ github.event.inputs.SUSFS_META != '-1' }}
         run: |
