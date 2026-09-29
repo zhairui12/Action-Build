@@ -749,10 +749,14 @@ jobs:
           done
 
           # 双保险：把数值常量直接钉死为 40796（不依赖 GitHub API 的提交数）
-          if [ -f kernel/Kbuild ] && grep -qE '^KSU_VERSION[[:space:]]*:=' kernel/Kbuild; then
-            sed -i 's/^KSU_VERSION[[:space:]]*:=.*/KSU_VERSION := 40796/' kernel/Kbuild
-            echo "--> 强制 KSU_VERSION := 40796   (kernel/Kbuild)"
-          fi
+          for f in kernel/Kbuild kernel/Makefile; do
+            [ -f "$f" ] || continue
+            if grep -qE '^KSU_VERSION[[:space:]]*:=' "$f"; then
+              sed -i 's/^KSU_VERSION[[:space:]]*:=.*/KSU_VERSION := 40796/' "$f"
+              echo "--> 强制 KSU_VERSION := 40796   ($f)"
+            fi
+          done
+          grep -rnE '^KSU_VERSION[[:space:]]*:=' kernel/Kbuild kernel/Makefile 2>/dev/null || true
 
           echo "::group::版本相关行"
           grep -nE '^REPO_BRANCH|^VERSION_BASE|^VERSION_OFFSET|^KSU_VERSION[[:space:]]*:=' kernel/Kbuild kernel/Makefile 2>/dev/null || true
@@ -1561,6 +1565,11 @@ jobs:
             echo "   $m = $n"
           done
           echo "期望 version 串: Linux version 6.6.118-android15-8-g93e223c276e7-abogki500782043-4k"
+          # 硬性检查：SUSFS 与 KPM(KernelPatch) 必须真的编进 Image
+          SUSFS_N=$(strings -a Image | grep -c 'susfs' || true)
+          KP_N=$(strings -a Image | grep -c 'KernelPatch' || true)
+          [ "$SUSFS_N" -gt 0 ] || { echo "::error::SUSFS 未编入 Image (susfs=0)"; exit 1; }
+          [ "$KP_N" -gt 0 ] || { echo "::error::KPM/KernelPatch 未注入 Image"; exit 1; }
           echo "======================================================"
 
       - name: Download Latest SUSFS Module from CI
