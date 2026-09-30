@@ -832,6 +832,26 @@ jobs:
           source $REJ_CHECKER
           check_rejects .
 
+      # === 把内核报告的 SUSFS 版本改成 v2.1.0（匹配 SukiSU v4.1.3 管理器）===
+      # 原因：SukiSU v4.1.3 管理器里 MAX_SUSFS_VERSION = "2.1.0"，且它对每条 SUSFS 命令都会先
+      # 用 `ksud susfs version`(即内核的 SUSFS 版本) 拼出 "ksu_susfs_<版本>" 去自己 APK 资源里取；
+      # 内核报 2.3.0 时找不到该文件 → 所有 SUSFS 图形命令都返回 "binary not found" → 弹"命令执行失败"。
+      # 改成 2.1.0 后，管理器会部署它自带的 ksu_susfs_2.1.0，SUSFS 页面即可正常使用。
+      - name: Pin SUSFS version string to v2.1.0 (match SukiSU v4.1.3 manager)
+        run: |
+          cd kernel_workspace/kernel_platform/common
+          echo "::group::SUSFS_VERSION before"
+          grep -rn --include='*.h' --include='*.c' 'SUSFS_VERSION "v' . 2>/dev/null | head -10 || true
+          echo "::endgroup::"
+          grep -rl --include='*.h' --include='*.c' 'SUSFS_VERSION "v' . 2>/dev/null | while read -r f; do
+            sed -i 's/SUSFS_VERSION "v[0-9.]*"/SUSFS_VERSION "v2.1.0"/g' "$f"
+            echo "patched: $f"
+          done
+          echo "::group::SUSFS_VERSION after"
+          grep -rn --include='*.h' --include='*.c' 'SUSFS_VERSION "v' . 2>/dev/null | head -10 || true
+          echo "::endgroup::"
+          grep -rq --include='*.h' --include='*.c' 'SUSFS_VERSION "v2.1.0"' . || { echo "::error::SUSFS_VERSION 未成功改成 v2.1.0"; exit 1; }
+
       # 已禁用：用户管理器是【官方原版】SukiSU_v4.1.3_40796-release.apk(sha256 逐字节一致)，
       # 签名与内核内置的 EXPECTED_HASH 匹配，无需绕过；恒真反而会让内核误认管理器 appid → 管理器连不上内核。
       - name: "Patch is_manager_apk (已禁用 / DISABLED - official manager signature matches)"
