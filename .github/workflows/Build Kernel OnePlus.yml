@@ -832,7 +832,10 @@ jobs:
           source $REJ_CHECKER
           check_rejects .
 
-      - name: Patch is_manager_apk to always return true
+      # 已禁用：用户管理器是【官方原版】SukiSU_v4.1.3_40796-release.apk(sha256 逐字节一致)，
+      # 签名与内核内置的 EXPECTED_HASH 匹配，无需绕过；恒真反而会让内核误认管理器 appid → 管理器连不上内核。
+      - name: "Patch is_manager_apk (已禁用 / DISABLED - official manager signature matches)"
+        if: false
         run: |
           APK_SIGN="kernel_workspace/kernel_platform/common/drivers/kernelsu/manager/apk_sign.c"
           if [ ! -f "$APK_SIGN" ]; then
